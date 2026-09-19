@@ -1,0 +1,72 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Diagnostic reports (Node.js)
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like nyc, istanbul
+coverage/
+.nyc_output
+
+# Dependency directories
+node_modules/
+jspm_packages/
+
+# Optional npm cache directory
+.npm
+
+# Build / output directories
+dist/
+build/
+out/
+lib/
+*.tsbuildinfo
+
+# Environment variables and secrets
+.env
+.env.*.local
+.env.local
+
+# Editor directories and files
+.vscode/
+.idea/
+*.sublime-workspace
+*.sublime-project
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Compiled binary addons
+build/Release
+
+# Test and debug artifacts
+*.tgz
+*.log.*
+
+# Yarn v2+ cache
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.pnp.*
+
+# Lock files (if you intentionally want to ignore them, otherwise keep)
+# package-lock.json
+# yarn.lock
+
+# Misc
+*.pem
+*.key
+*.crt
+*.p12

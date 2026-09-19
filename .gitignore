@@ -1,0 +1,73 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+dist-ssr/
+build/
+*.tsbuildinfo
+
+# Vercel project linkage (written by `vercel link` / `vercel dev`)
+.vercel/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*-private-key*
+*.private-key.pem
+
+# Logs and debug
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Cache
+*.cache
+.parcel-cache/
+.vite/
+.turbo/
+.eslintcache
+
+# Test and coverage
+coverage/
+.nyc_output/
+*.lcov
+
+# OS-generated files
+.DS_Store
+.DS_Store?
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Obsidian (user-specific, do not commit)
+.obsidian/
+obsidian/.obsidian/
+# Optional: Obsidian trash
+# obsidian/.trash/
+
+# Editor and IDE
+.idea/
+.vscode/
+.kilo/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*~
+
+# Optional: keep shared VSCode extensions recommendation
+# !.vscode/extensions.json
+
+# Misc
+*.local
+.cache/
+.gitnexus
