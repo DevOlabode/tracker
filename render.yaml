@@ -6,9 +6,8 @@ services:
     buildCommand: npm install
     startCommand: npm start
 
-  - type: web
+  - type: static
     name: tracker-frontend
-    runtime: static
     rootDir: frontend
     buildCommand: npm install && npm run build
     staticPublishPath: dist
