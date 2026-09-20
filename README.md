@@ -16,11 +16,17 @@ Open the printed local URL (usually http://localhost:5173).
 
 ## 2. Configure the names
 
-Edit `frontend/src/config/names.js` and set `NAMES` to the real list. No other file needs to change.
+Edit `frontend/src/config/names.js`:
+
+```js
+export const NAMES = ['ESTHER', 'PELUMI', 'SUBOMI', 'BRIGHT']
+```
+
+Replace with the real list. No other file needs to change.
 
 ## 3. Deploy the Google Apps Script
 
-1. Open your target spreadsheet.
+1. Open the target spreadsheet: https://docs.google.com/spreadsheets/d/1RbDdO_57iGSi2LqIjjrIXNnRZglfzjeWFYwus-zrSMo/edit
 2. Extensions → Apps Script.
 3. Replace the default code with the contents of `apps-script/Code.gs`.
 4. (Optional) Edit the `SPREADSHEET_ID` / `SHEET_NAME` constants at the top of the file if you're pointing at a different sheet or tab. By default it targets the first tab.
