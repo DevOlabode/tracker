@@ -10,11 +10,24 @@ body {
 }
 
 .page {
+  position: relative;
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 24px;
+}
+
+.page-home {
+  background: url('/images/logo.jpg') center / cover no-repeat;
+}
+
+.logo {
+  position: absolute;
+  top: 24px;
+  left: 24px;
+  max-height: 60px;
+  width: auto;
 }
 
 .card {
