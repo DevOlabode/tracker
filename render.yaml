@@ -1,20 +1,9 @@
 services:
   - type: web
-    name: tracker-backend
+    name: tracker
     runtime: node
-    rootDir: backend
-    buildCommand: npm install
-    startCommand: npm start
-
-  - type: static
-    name: tracker-frontend
-    rootDir: frontend
-    buildCommand: npm install && npm run build
-    staticPublishPath: dist
+    buildCommand: npm install --prefix backend && npm install --prefix frontend && npm run build --prefix frontend
+    startCommand: npm start --prefix backend
     envVars:
       - key: VITE_GOOGLE_APPS_SCRIPT_URL
         sync: false
-    routes:
-      - type: rewrite
-        source: /*
-        destination: /index.html
