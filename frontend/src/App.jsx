@@ -9,7 +9,7 @@ export default function App() {
   return (
     <div className="page">
       <div className="card">
-        <h1>Submit Entr</h1>
+        <h1>Submit En</h1>
         {view === 'home' && <Home onSelect={setView} />}
         {view === 'individual' && <IndividualForm onBack={() => setView('home')} />}
         {view === 'group' && <GroupForm onBack={() => setView('home')} />}
