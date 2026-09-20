@@ -7,8 +7,7 @@ export default function App() {
   const [view, setView] = useState('home') // home | individual | group
 
   return (
-    <div className={view === 'home' ? 'page page-home' : 'page'}>
-      {view === 'home' && <img src="/images/logo.jpg" alt="Logo" className="logo" />}
+    <div className="page">
       <div className="card">
         <h1>SUBMIT ENTRY</h1>
         {view === 'home' && <Home onSelect={setView} />}
