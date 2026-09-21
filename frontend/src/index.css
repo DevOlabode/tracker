@@ -75,9 +75,9 @@ body {
 
 .site-logo {
   display: block;
-  height: 64px;
+  height: 80px;
   width: auto;
-  margin: 0 0 24px;
+  margin: 0 auto 24px;
   border-radius: 8px;
 }
 
