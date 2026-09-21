@@ -5,25 +5,91 @@
 body {
   margin: 0;
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  background: #f4f5f7;
   color: #1a1a1a;
 }
 
 .page {
   min-height: 100vh;
   display: flex;
+}
+
+.bg-half {
+  position: relative;
+  min-height: 100vh;
+  background: url('/Background.jpg') center center / cover no-repeat;
+}
+
+.bg-left {
+  flex: 0 0 38%;
+  overflow: hidden;
+  background: none;
+}
+
+.bg-left::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: url('/Background.jpg') center center / cover no-repeat;
+  filter: blur(18px);
+  transform: scale(1.1);
+}
+
+.bg-left-image {
+  position: absolute;
+  inset: 0;
+  background: url('/Background.jpg') center center / contain no-repeat;
+  transform: scale(1.15);
+}
+
+.bg-right {
+  flex: 1;
+  display: flex;
   align-items: center;
   justify-content: center;
   padding: 24px;
+  overflow: hidden;
+}
+
+.bg-right::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: inherit;
+  filter: blur(18px);
+  transform: scale(1.1);
+}
+
+@media (max-width: 720px) {
+  .page {
+    flex-direction: column;
+  }
+
+  .bg-left {
+    display: none;
+  }
+
+  .bg-right {
+    min-height: 100vh;
+  }
+}
+
+.site-logo {
+  display: block;
+  height: 64px;
+  width: auto;
+  margin: 0 0 24px;
+  border-radius: 8px;
 }
 
 .card {
+  position: relative;
+  z-index: 1;
   width: 100%;
-  max-width: 420px;
+  max-width: 480px;
   background: #fff;
   border-radius: 12px;
-  padding: 32px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  padding: 40px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
 }
 
 h1 {
@@ -121,6 +187,7 @@ button:disabled {
   border: 1px solid #ccc;
   border-radius: 8px;
   background: #fff;
+  color: #1a1a1a;
   cursor: pointer;
   font: inherit;
 }
@@ -130,7 +197,8 @@ button:disabled {
 }
 
 .option-title {
-  font-weight: 600;
+  font-family: 'Raleway', system-ui, sans-serif;
+  font-weight: 400;
   font-size: 1rem;
 }
 

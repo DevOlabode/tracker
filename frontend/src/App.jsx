@@ -8,11 +8,16 @@ export default function App() {
 
   return (
     <div className="page">
-      <div className="card">
-        <h1>SUBMit</h1>
-        {view === 'home' && <Home onSelect={setView} />}
-        {view === 'individual' && <IndividualForm onBack={() => setView('home')} />}
-        {view === 'group' && <GroupForm onBack={() => setView('home')} />}
+      <div className="bg-half bg-left">
+        <div className="bg-left-image" />
+      </div>
+      <div className="bg-half bg-right">
+        <div className="card">
+          <img src="/logo.jpg" alt="Logo" className="site-logo" />
+          {view === 'home' && <Home onSelect={setView} />}
+          {view === 'individual' && <IndividualForm onBack={() => setView('home')} />}
+          {view === 'group' && <GroupForm onBack={() => setView('home')} />}
+        </div>
       </div>
     </div>
   )
