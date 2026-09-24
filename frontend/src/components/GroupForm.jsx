@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { NAMES } from '../config/names'
 import { submitEntry } from '../services/submissions'
+import LocationField, { OTHER, resolveLocation } from './LocationField'
 
-const EMPTY_FORM = { names: [], location: '', date: '' }
+const EMPTY_FORM = { names: [], location: '', otherLocation: '', date: '' }
 
 export default function GroupForm({ onBack }) {
   const [form, setForm] = useState(EMPTY_FORM)
@@ -13,7 +14,7 @@ export default function GroupForm({ onBack }) {
   function validate() {
     const next = {}
     if (form.names.length === 0) next.names = 'Select at least one name.'
-    if (!form.location.trim()) next.location = 'Location is required.'
+    if (!resolveLocation(form)) next.location = form.location === OTHER ? 'Please type your location.' : 'Please select a location.'
     if (!form.date) next.date = 'Date is required.'
     setErrors(next)
     return Object.keys(next).length === 0
@@ -41,7 +42,7 @@ export default function GroupForm({ onBack }) {
       const result = await submitEntry({
         type: 'Group',
         name: form.names.join(', '),
-        location: form.location,
+        location: resolveLocation(form),
         date: form.date,
       })
       setStatus('success')
@@ -92,17 +93,12 @@ export default function GroupForm({ onBack }) {
           {errors.names && <p className="error">{errors.names}</p>}
         </div>
 
-        <div className="field">
-          <label htmlFor="location">Location</label>
-          <input
-            id="location"
-            type="text"
-            placeholder="Enter location"
-            value={form.location}
-            onChange={handleChange('location')}
-          />
-          {errors.location && <p className="error">{errors.location}</p>}
-        </div>
+        <LocationField
+          location={form.location}
+          otherLocation={form.otherLocation}
+          onChange={(patch) => setForm((f) => ({ ...f, ...patch }))}
+          error={errors.location}
+        />
 
         <div className="field">
           <label htmlFor="date">Date</label>
