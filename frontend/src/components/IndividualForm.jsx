@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { NAMES } from '../config/names'
 import { submitEntry } from '../services/submissions'
+import DateField, { dateError } from './DateField'
 import LocationField, { OTHER, resolveLocation } from './LocationField'
 
 const EMPTY_FORM = { name: '', location: '', otherLocation: '', date: '' }
@@ -15,7 +16,8 @@ export default function IndividualForm({ onBack }) {
     const next = {}
     if (!form.name) next.name = 'Please select a name.'
     if (!resolveLocation(form)) next.location = form.location === OTHER ? 'Please type your location.' : 'Please select a location.'
-    if (!form.date) next.date = 'Date is required.'
+    const dateMsg = dateError(form.date)
+    if (dateMsg) next.date = dateMsg
     setErrors(next)
     return Object.keys(next).length === 0
   }
@@ -74,11 +76,11 @@ export default function IndividualForm({ onBack }) {
           error={errors.location}
         />
 
-        <div className="field">
-          <label htmlFor="date">Date</label>
-          <input id="date" type="date" value={form.date} onChange={handleChange('date')} />
-          {errors.date && <p className="error">{errors.date}</p>}
-        </div>
+        <DateField
+          value={form.date}
+          onChange={(date) => setForm((f) => ({ ...f, date }))}
+          error={errors.date}
+        />
 
         <button type="submit" disabled={status === 'submitting'}>
           {status === 'submitting' ? 'Submitting…' : 'Submit'}
