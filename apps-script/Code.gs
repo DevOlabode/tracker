@@ -1,7 +1,5 @@
-// --- Configuration: change these if your sheet/tab changes ---
-const SPREADSHEET_ID = '1RbDdO_57iGSi2LqIjjrIXNnRZglfzjeWFYwus-zrSMo'
-const SHEET_GID = 1368378424 // the tab's gid from the URL (#gid=...)
-// ---------------------------------------------------------------
+const SPREADSHEET_ID = '1uxUdiJSHKYWBN_dVoiK1Aq85bhvFpKinjJexFWSFOqE'
+const SHEET_GID = 1458779538 // the tab's gid from the URL (#gid=...)
 
 function doPost(e) {
   try {

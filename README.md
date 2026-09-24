@@ -26,7 +26,7 @@ Replace with the real list. No other file needs to change.
 
 ## 3. Deploy the Google Apps Script
 
-1. Open the target spreadsheet: https://docs.google.com/spreadsheets/d/1RbDdO_57iGSi2LqIjjrIXNnRZglfzjeWFYwus-zrSMo/edit
+1. Open the target spreadsheet: https://docs.google.com/spreadsheets/d/1uxUdiJSHKYWBN_dVoiK1Aq85bhvFpKinjJexFWSFOqE/edit
 2. Extensions → Apps Script.
 3. Replace the default code with the contents of `apps-script/Code.gs`.
 4. (Optional) Edit the `SPREADSHEET_ID` / `SHEET_GID` constants at the top of the file if you're pointing at a different sheet or tab. `SHEET_GID` is the `#gid=` number in the tab's URL.
