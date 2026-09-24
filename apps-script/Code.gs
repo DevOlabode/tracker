@@ -1,6 +1,6 @@
 // --- Configuration: change these if your sheet/tab changes ---
 const SPREADSHEET_ID = '1RbDdO_57iGSi2LqIjjrIXNnRZglfzjeWFYwus-zrSMo'
-const SHEET_NAME = null // null = use the first sheet/tab
+const SHEET_GID = 1368378424 // the tab's gid from the URL (#gid=...)
 // ---------------------------------------------------------------
 
 function doPost(e) {
@@ -20,10 +20,10 @@ function doPost(e) {
     }
 
     const ss = SpreadsheetApp.openById(SPREADSHEET_ID)
-    const sheet = SHEET_NAME ? ss.getSheetByName(SHEET_NAME) : ss.getSheets()[0]
+    const sheet = ss.getSheets().find(s => s.getSheetId() === SHEET_GID)
 
     if (!sheet) {
-      console.error('Sheet not found: SHEET_NAME=' + SHEET_NAME)
+      console.error('Sheet not found: SHEET_GID=' + SHEET_GID)
       return jsonResponse({ success: false, message: 'Target sheet/tab not found.' })
     }
 

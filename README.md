@@ -29,7 +29,7 @@ Replace with the real list. No other file needs to change.
 1. Open the target spreadsheet: https://docs.google.com/spreadsheets/d/1RbDdO_57iGSi2LqIjjrIXNnRZglfzjeWFYwus-zrSMo/edit
 2. Extensions → Apps Script.
 3. Replace the default code with the contents of `apps-script/Code.gs`.
-4. (Optional) Edit the `SPREADSHEET_ID` / `SHEET_NAME` constants at the top of the file if you're pointing at a different sheet or tab. By default it targets the first tab.
+4. (Optional) Edit the `SPREADSHEET_ID` / `SHEET_GID` constants at the top of the file if you're pointing at a different sheet or tab. `SHEET_GID` is the `#gid=` number in the tab's URL.
 5. Deploy → New deployment → type "Web app".
    - Execute as: **Me**
    - Who has access: **Anyone** (required for the frontend to reach it without Google login)
