@@ -1,5 +1,5 @@
-const SPREADSHEET_ID = '1uxUdiJSHKYWBN_dVoiK1Aq85bhvFpKinjJexFWSFOqE'
-const SHEET_GID = 1458779538 // the tab's gid from the URL (#gid=...)
+const SPREADSHEET_ID = '1v1a-lJpxiyhObaMj52eAj-_DX57CPgYD14Z9_zgXWUQ'
+const SHEET_GID = 436098174 // the tab's gid from the URL (#gid=...)
 
 function doPost(e) {
   try {
