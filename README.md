@@ -49,7 +49,7 @@ Restart `npm run dev` after changing `.env`.
 
 1. User fills the form and submits.
 2. The frontend POSTs `{ name, location, date }` as JSON to the Apps Script URL.
-3. Apps Script parses the body, validates the three fields, and appends a row: `Timestamp | Name | Location | Date` (timestamp is set server-side by Apps Script, not the browser).
+3. Apps Script parses the body, validates the three fields, and appends a row: `Type | Name | Location | Date`.
 4. Apps Script returns `{ success, message }`, which the frontend uses to show a success or error state.
 
 ### Why the request uses `Content-Type: text/plain`
@@ -61,6 +61,6 @@ Apps Script web apps don't implement a CORS preflight (`OPTIONS`) handler. If th
 1. Deploy the Apps Script (step 3) and set the URL in `.env` (step 4).
 2. Run `npm run dev` and open the form.
 3. Submit with a name, location, and date — confirm a success message appears and the form clears.
-4. Check the spreadsheet — a new row should appear with a server timestamp.
+4. Check the spreadsheet — a new row should appear.
 5. Try submitting with a field missing to confirm client-side validation blocks it.
 6. Try an invalid/unreachable `VITE_GOOGLE_APPS_SCRIPT_URL` to confirm the error state shows correctly.

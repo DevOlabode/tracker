@@ -25,7 +25,7 @@ function doPost(e) {
       return jsonResponse({ success: false, message: 'Target sheet/tab not found.' })
     }
 
-    sheet.appendRow([new Date(), type, name, location, date])
+    sheet.appendRow([type, name, location, date])
     console.log('Row appended for ' + type + ': ' + name)
 
     return jsonResponse({ success: true, message: 'Submission saved successfully' })
