@@ -35,6 +35,8 @@ Replace with the real list. No other file needs to change.
    - Who has access: **Anyone** (required for the frontend to reach it without Google login)
 6. Copy the resulting web app URL (ends in `/exec`).
 
+The same project also holds the Meet attendance tracker (`apps-script/Meet.gs`), which writes to its own tab. Every file in `apps-script/` goes into the one project, and `appsscript.json` (Project Settings → "Show appsscript.json") covers the permissions both need. Run `runAttendance` manually or add a time-driven trigger for it (Triggers → Add trigger). It skips meetings still in progress and ones already in the sheet, so it's safe to re-run.
+
 ## 4. Point the frontend at the deployment
 
 Put the URL from step 3 into `frontend/.env`:
