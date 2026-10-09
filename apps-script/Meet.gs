@@ -18,9 +18,11 @@ const PRESENT_MIN_MINUTES = 10 // attendance rule: >= this many minutes = Presen
 const MIN_CONFERENCE_MINUTES = 10 // conferences shorter than this (test calls) are ignored
 const NIGHTLY_HOUR = 2 // hour (0-23, TZ) the nightly trigger runs; after the meeting has ended
 const TZ = 'America/Edmonton'
-const ATTENDANCE_HEADER = ['Date', 'Meeting', 'Member', 'Join Time', 'Leave Time', 'Duration (min)', 'Sessions', 'Status', 'Joined As']
+const ATTENDANCE_HEADER = ['Date', 'Meeting', 'Member', 'Join Time', 'Leave Time', 'Duration (min)', 'Status']
 const NIL = '-' // filler for an absent member's time fields
 const STATUS_ORDER = { Present: 0, Guest: 1, Absent: 2 }
+const STATUS_COL = 7 // column of 'Status' in ATTENDANCE_HEADER (1-based)
+const STATUS_CHOICES = ['Present', 'Absent', 'Excused', 'Guest'] // dropdown; Excused is only ever set by hand
 
 function runAttendance() {
   const since = new Date(Date.now() - LOOKBACK_HOURS * 3600 * 1000).toISOString()
@@ -67,31 +69,35 @@ function runAttendance() {
 
     members.forEach((member, i) => {
       const a = matched.get(i)
-      if (a && a.minutes >= PRESENT_MIN_MINUTES) {
-        // "Joined As" shows the Meet name only when it differs, so loose matches are easy to check.
-        const joinedAs = normalize_(a.name) === normalize_(member.name) ? '' : a.name
-        rows.push([meetingDate, meetingStart, member.name, a.join, a.leave, a.minutes, a.sessions, 'Present', joinedAs])
+      if (a) {
+        // Members who joined but stayed under the rule are Absent, with their times kept as proof.
+        const status = a.minutes >= PRESENT_MIN_MINUTES ? 'Present' : 'Absent'
+        rows.push([meetingDate, meetingStart, member.name, a.join, a.leave, a.minutes, status])
       } else {
-        rows.push([meetingDate, meetingStart, member.name, NIL, NIL, NIL, NIL, 'Absent', ''])
+        rows.push([meetingDate, meetingStart, member.name, NIL, NIL, NIL, 'Absent'])
       }
     })
 
-    // Anyone on the call who couldn't be matched to a core member.
+    // Anyone on the call who couldn't be matched to a core member, however briefly.
     const matchedAttendees = new Set(matched.values())
     Object.keys(attended).forEach(key => {
       const a = attended[key]
-      if (matchedAttendees.has(a) || a.minutes < PRESENT_MIN_MINUTES) return
-      rows.push([meetingDate, meetingStart, a.name, a.join, a.leave, a.minutes, a.sessions, 'Guest', a.name])
+      if (matchedAttendees.has(a)) return
+      rows.push([meetingDate, meetingStart, a.name, a.join, a.leave, a.minutes, 'Guest'])
     })
 
-    rows.sort((x, y) => STATUS_ORDER[x[7]] - STATUS_ORDER[y[7]] || x[2].localeCompare(y[2]))
+    rows.sort((x, y) => STATUS_ORDER[x[6]] - STATUS_ORDER[y[6]] || x[2].localeCompare(y[2]))
 
     if (rows.length) {
-      const firstRow = sheet.getLastRow() + 1
+      // Leave one blank row between meetings (none right under the header).
+      const lastRow = sheet.getLastRow()
+      const firstRow = lastRow + (lastRow > 1 ? 2 : 1)
       // Plain text keeps the time columns (Meeting, Join Time, Leave Time) as "9:15 PM";
       // otherwise Sheets turns them into 24h time values.
       ;[2, 4, 5].forEach(col => sheet.getRange(firstRow, col, rows.length, 1).setNumberFormat('@'))
       sheet.getRange(firstRow, 1, rows.length, rows[0].length).setValues(rows)
+      sheet.getRange(firstRow, STATUS_COL, rows.length, 1).setDataValidation(
+        SpreadsheetApp.newDataValidation().requireValueInList(STATUS_CHOICES, true).build())
     }
     processed++
   })
@@ -108,8 +114,8 @@ function installNightlyTrigger() {
 }
 
 // Per-person attendance for one conference, keyed by normalized name.
-// Join/leave intervals are grouped by name and overlapping ones merged,
-// so two devices at once count as one session and their time isn't doubled.
+// Join/leave intervals are grouped by name and overlapping ones merged, so time on
+// two devices at once isn't doubled, while separate visits (left and rejoined) add up.
 function attendance_(rec) {
   const byName = {}
   listAll_(rec.name + '/participants', 'participants').forEach(p => {
@@ -124,13 +130,12 @@ function attendance_(rec) {
   Object.keys(byName).forEach(key => {
     const intervals = byName[key].intervals.sort((a, b) => a[0] - b[0])
     if (!intervals.length) return
-    let totalMs = 0, sessions = 1, curStart = intervals[0][0], curEnd = intervals[0][1]
+    let totalMs = 0, curStart = intervals[0][0], curEnd = intervals[0][1]
     intervals.slice(1).forEach(([start, end]) => {
       if (start <= curEnd) {
         if (end > curEnd) curEnd = end
       } else {
         totalMs += curEnd - curStart
-        sessions++
         curStart = start
         curEnd = end
       }
@@ -141,7 +146,6 @@ function attendance_(rec) {
       join: Utilities.formatDate(intervals[0][0], TZ, 'h:mm a'),
       leave: Utilities.formatDate(curEnd, TZ, 'h:mm a'), // merged intervals are sorted, so curEnd is the last leave
       minutes: Math.round(totalMs / 60000),
-      sessions,
     }
   })
   return out
@@ -266,6 +270,24 @@ function getAttendanceSheet_() {
   // Keep row 1 in sync with the columns we write.
   sheet.getRange(1, 1, 1, ATTENDANCE_HEADER.length).setValues([ATTENDANCE_HEADER])
   return sheet
+}
+
+// Run from the editor to see who the script counts as core (with sheet row numbers) and who it leaves out.
+function checkCoreMembers() {
+  const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheets().find(s => s.getSheetId() === MEMBERS_GID)
+  if (!sheet) throw new Error('Members tab not found: gid=' + MEMBERS_GID)
+  const values = sheet.getDataRange().getValues()
+  const header = values[0].map(normalize_)
+  const nameCol = header.indexOf(normalize_(MEMBERS_NAME_HEADER))
+  const typeCol = header.indexOf(normalize_(MEMBERS_TYPE_HEADER))
+  Logger.log('Reading "' + sheet.getName() + '" in ' + sheet.getParent().getName())
+  const core = getMembers_().map(m => normalize_(m.name))
+  values.slice(1).forEach((r, i) => {
+    const name = String(r[nameCol]).trim()
+    if (!name) return
+    Logger.log((core.includes(normalize_(name)) ? 'CORE      ' : 'left out  ') +
+      'row ' + (i + 2) + ': ' + name + ' (' + String(r[typeCol]).trim() + ')')
+  })
 }
 
 // Core members (name, email, Meet aliases) from the members tab, found by header so columns can move.
