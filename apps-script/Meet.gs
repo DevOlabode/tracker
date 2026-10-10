@@ -11,7 +11,7 @@ const MEMBERS_GID = 0 // members tab's gid, in the SPREADSHEET_ID spreadsheet (C
 const MEMBERS_NAME_HEADER = 'Name' // members tab header of the name column
 const MEMBERS_TYPE_HEADER = 'Member Type' // members tab header of the member type column
 const MEMBERS_ACTIVE_HEADER = 'Active?' // members tab header of the active column; FALSE/No rows are skipped
-const MEMBERS_EMAIL_HEADER = 'Email' // optional: used to match Meet names like "dammyedekere"
+const MEMBERS_EMAIL_HEADER = 'Email' // optional: used to match Meet names like "johnsmith"
 const MEMBERS_ALIAS_HEADER = 'Meet Name' // optional column: extra names someone uses in Meet, comma-separated
 const CORE_TYPE = 'Core' // only members whose type starts with this word (e.g. "Core", "Core Member") are expected
 const LOOKBACK_HOURS = 48 // safe to overlap: meetings already in the sheet are skipped
@@ -323,7 +323,7 @@ function attendance_(recs) {
 
 // Pairs core members with Meet attendees, from strictest rule to loosest.
 // A pair is only accepted when it's unambiguous (one candidate each way), so
-// "Edekere" alone never gets credited to either Dammy or Precious Edekere,
+// "Smith" alone never gets credited to either Jane or John Smith,
 // and an ambiguous name like that doesn't stop the others from matching.
 // Returns Map(member index -> attendee).
 function matchMembers_(members, attendees) {
@@ -332,12 +332,15 @@ function matchMembers_(members, attendees) {
   const rules = [
     // Same name, ignoring case, accents and punctuation; or a listed Meet Name.
     (m, a) => [m.name].concat(m.aliases).some(n => loose_(n) === loose_(a.name)),
-    // Same words in a different order, or written without spaces ("Ayo Sunmola" / "AyoSunmola").
+    // Same words in a different order, or written without spaces ("Mary Jones" / "MaryJones").
     (m, a) => sameWords_(m.name, a.name) || compact_(m.name) === compact_(a.name),
     // Every word of the shorter name matches a word of the longer one, allowing
-    // short forms and small typos ("Oba" / "Oba Adeyemi", "Ayo" / "Ayomide", "Precius" / "Precious").
+    // short forms and small typos ("Tom" / "Tom Brown", "Sam" / "Samuel", "Jonathon" / "Jonathan").
     (m, a) => wordsCovered_(a.name, m.name) || wordsCovered_(m.name, a.name),
-    // Meet name matches the email before the @ ("Dammy E" / "dammy.edekere@gmail.com").
+    // Same first name and a surname spelled differently but close: sounds alike
+    // ("Philips" / "Filips") or mostly the same start ("Hendricks" / "Hendrikson").
+    (m, a) => similarNames_(m.name, a.name),
+    // Meet name matches the email before the @ ("John S" / "john.smith@gmail.com").
     (m, a) => emailMatches_(m.email, a.name),
   ]
 
@@ -360,7 +363,7 @@ function matchMembers_(members, attendees) {
   return matched
 }
 
-// Lowercase, accents and punctuation removed, single spaces: "Adé-Ola  O." -> "ade ola o"
+// Lowercase, accents and punctuation removed, single spaces: "Zoë-Ann  B." -> "zoe ann b"
 function loose_(name) {
   return String(name).normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
@@ -393,13 +396,33 @@ function wordsCovered_(short, long) {
   })
 }
 
-// Same word, an initial ("E" / "Edekere"), one is a 3+ letter start of the other
-// ("Ayo" / "Ayomide"), or a one-letter typo in a 5+ letter word.
+// Same word, an initial ("S" / "Smith"), one is a 3+ letter start of the other
+// ("Sam" / "Samuel"), or a one-letter typo in a 5+ letter word.
 function wordsMatch_(x, y) {
   if (x === y) return true
   const [a, b] = x.length <= y.length ? [x, y] : [y, x]
   if ((a.length === 1 || a.length >= 3) && b.startsWith(a)) return true
   return a.length >= 5 && editDistance_(a, b) <= 1
+}
+
+function similarNames_(x, y) {
+  const wx = words_(x), wy = words_(y)
+  if (wx.length < 2 || wy.length < 2) return false
+  return wordsMatch_(wx[0], wy[0]) && surnamesClose_(wx[wx.length - 1], wy[wy.length - 1])
+}
+
+// Close enough after evening out common spelling swaps (ph/f, ck/k, y/i, doubled letters):
+// equal, a 1-2 letter slip in a longer name, or sharing a 5+ letter start that is most of the name.
+// "Wilson" / "Wilkins" share only "Wil", so they stay different people.
+function surnamesClose_(a, b) {
+  const sound = w => w.replace(/ph/g, 'f').replace(/ck/g, 'k').replace(/y/g, 'i').replace(/(.)\1+/g, '$1')
+  const sa = sound(a), sb = sound(b)
+  if (sa === sb) return true
+  const shorter = Math.min(sa.length, sb.length)
+  if (editDistance_(sa, sb) <= (shorter >= 6 ? 2 : 1)) return true
+  let prefix = 0
+  while (prefix < shorter && sa[prefix] === sb[prefix]) prefix++
+  return prefix >= 5 && prefix >= shorter * 0.6
 }
 
 function editDistance_(a, b) {
@@ -415,8 +438,8 @@ function editDistance_(a, b) {
 }
 
 // Meet name vs the part of the email before @, digits dropped. Either the whole
-// thing matches ("dammyedekere" / "dammy.edekere22@gmail.com"), or the name has one
-// word per email part ("Dammy E" / "dammy.edekere@..."), so a lone surname doesn't count.
+// thing matches ("johnsmith" / "john.smith22@gmail.com"), or the name has one
+// word per email part ("John S" / "john.smith@..."), so a lone surname doesn't count.
 function emailMatches_(email, name) {
   const local = String(email || '').split('@')[0].toLowerCase()
   const parts = local.split(/[^a-z]+/).filter(Boolean)
