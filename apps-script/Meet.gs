@@ -1,8 +1,9 @@
 // YFJ attendance
 // Pulls participants for every finished conference held in one Meet space
 // within the last LOOKBACK_HOURS, checks them against the core members tab,
-// and writes one row per core member (Present or Absent) plus any guests to the attendance tab.
-// Lives in the same project as Code.gs; run installNightlyTrigger once to run runAttendance every night.
+// and writes one row per core member (Present, Absent or Excused) plus any guests to the attendance tab.
+// Lives in the same project as Code.gs; run installNightlyTrigger once to run runAttendance every night,
+// and createExcuseForm once to make the "can't make it" form whose answers mark people Excused.
 
 const MEETING_CODE = 'hps-cndp-aos' // from the Meet URL
 const ATTENDANCE_GID = 1336193348 // attendance tab's gid from the URL (#gid=...)
@@ -15,14 +16,28 @@ const MEMBERS_ALIAS_HEADER = 'Meet Name' // optional column: extra names someone
 const CORE_TYPE = 'Core' // only members whose type starts with this word (e.g. "Core", "Core Member") are expected
 const LOOKBACK_HOURS = 48 // safe to overlap: meetings already in the sheet are skipped
 const PRESENT_MIN_MINUTES = 10 // attendance rule: >= this many minutes = Present
-const MIN_CONFERENCE_MINUTES = 10 // conferences shorter than this (test calls) are ignored
-const NIGHTLY_HOUR = 2 // hour (0-23, TZ) the nightly trigger runs; after the meeting has ended
+const MIN_CONFERENCE_MINUTES = 10 // meetings shorter than this in total (test calls) are ignored
+const RESTART_GAP_MINUTES = 30 // a call restarted within this many minutes of the last one ending is the same meeting
+const NIGHTLY_HOUR = 2 // hour (0-23, TZ) the nightly trigger runs; after the meeting has ended.
+                       // Excuse forms sent before this hour count for the previous evening's meeting.
 const TZ = 'America/Edmonton'
-const ATTENDANCE_HEADER = ['Date', 'Meeting', 'Member', 'Join Time', 'Leave Time', 'Duration (min)', 'Status']
+const ATTENDANCE_HEADER = ['Meeting Start', 'Member', 'Join Time', 'Leave Time', 'Duration (min)', 'Status']
 const NIL = '-' // filler for an absent member's time fields
-const STATUS_ORDER = { Present: 0, Guest: 1, Absent: 2 }
-const STATUS_COL = 7 // column of 'Status' in ATTENDANCE_HEADER (1-based)
-const STATUS_CHOICES = ['Present', 'Absent', 'Excused', 'Guest'] // dropdown; Excused is only ever set by hand
+const STATUS_ORDER = { Present: 0, Guest: 1, Excused: 2, Absent: 3 }
+const STATUS_COL = 6 // column of 'Status' in ATTENDANCE_HEADER (1-based)
+const STATUS_CHOICES = ['Present', 'Absent', 'Excused', 'Guest'] // dropdown, so statuses can still be changed by hand
+const EXCUSE_FORM_TITLE = "YFJ prayer line: can't make it"
+const EXCUSE_Q_NAME = 'Your name'
+const EXCUSE_Q_TYPE = 'When?'
+const TYPE_TODAY = 'Just today'
+const TYPE_DAYS = 'A day or a few days in a row'
+const TYPE_WEEKLY = 'Same days every week, for the next 3 months'
+const EXCUSE_Q_FROM = 'From'
+const EXCUSE_Q_TO = 'Until'
+const EXCUSE_Q_WEEKLY_DAYS = 'Which days every week?'
+const WEEKLY_MONTHS = 3 // a weekly excuse lasts this long from the day it's filled in
+const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] // getUTCDay() order
+const EXCUSE_FORM_ID_PROP = 'EXCUSE_FORM_ID' // script property holding the form's id, set by createExcuseForm
 
 function runAttendance() {
   const since = new Date(Date.now() - LOOKBACK_HOURS * 3600 * 1000).toISOString()
@@ -36,45 +51,33 @@ function runAttendance() {
 
   const sheet = getAttendanceSheet_()
   const members = getMembers_()
+  syncExcuseFormNames_(members)
+  const excuses = getExcuses_()
   const done = recordedMeetings_(sheet)
   let processed = 0
 
-  records.forEach(rec => {
-    // Skip meetings still in progress (minutes would be partial) and ones already written,
-    // so re-running or a nightly trigger never duplicates rows.
-    if (!rec.endTime) {
-      Logger.log('Skipping in-progress conference ' + rec.name)
+  meetings_(records).forEach(({ start: meetingStart, recs }) => {
+    // Skip meetings already written, so re-running or a nightly trigger never duplicates rows.
+    if (done.has(meetingStart)) {
+      Logger.log('Already in the sheet: meeting started ' + meetingStart)
       return
     }
 
-    const confStart = new Date(rec.startTime)
-    const confMinutes = Math.round((new Date(rec.endTime) - confStart) / 60000)
-    if (confMinutes < MIN_CONFERENCE_MINUTES) {
-      Logger.log('Skipping short conference (test call?) started ' +
-        Utilities.formatDate(confStart, TZ, 'yyyy-MM-dd h:mm a') + ', ' + confMinutes + ' min')
-      return
-    }
-
-    // Meeting date = date the conference STARTED (handles 11:30 PM -> 12:30 AM)
-    const meetingDate = Utilities.formatDate(confStart, TZ, 'yyyy-MM-dd')
-    const meetingStart = Utilities.formatDate(confStart, TZ, 'h:mm a')
-    if (done.has(meetingDate + '|' + meetingStart)) {
-      Logger.log('Already in the sheet: meeting started ' + meetingDate + ' ' + meetingStart)
-      return
-    }
-
-    const attended = attendance_(rec)
+    const attended = attendance_(recs)
     const matched = matchMembers_(members, Object.keys(attended).map(key => attended[key]))
     const rows = []
 
+    const meetingDay = meetingStart.slice(0, 10) // yyyy-MM-dd
     members.forEach((member, i) => {
       const a = matched.get(i)
+      // Not present but filled in the form for this day -> Excused. Showing up always wins.
+      const missed = isExcused_(excuses, member.name, meetingDay) ? 'Excused' : 'Absent'
       if (a) {
         // Members who joined but stayed under the rule are Absent, with their times kept as proof.
-        const status = a.minutes >= PRESENT_MIN_MINUTES ? 'Present' : 'Absent'
-        rows.push([meetingDate, meetingStart, member.name, a.join, a.leave, a.minutes, status])
+        const status = a.minutes >= PRESENT_MIN_MINUTES ? 'Present' : missed
+        rows.push([meetingStart, member.name, a.join, a.leave, a.minutes, status])
       } else {
-        rows.push([meetingDate, meetingStart, member.name, NIL, NIL, NIL, 'Absent'])
+        rows.push([meetingStart, member.name, NIL, NIL, NIL, missed])
       }
     })
 
@@ -83,18 +86,20 @@ function runAttendance() {
     Object.keys(attended).forEach(key => {
       const a = attended[key]
       if (matchedAttendees.has(a)) return
-      rows.push([meetingDate, meetingStart, a.name, a.join, a.leave, a.minutes, 'Guest'])
+      rows.push([meetingStart, a.name, a.join, a.leave, a.minutes, 'Guest'])
     })
 
-    rows.sort((x, y) => STATUS_ORDER[x[6]] - STATUS_ORDER[y[6]] || x[2].localeCompare(y[2]))
+    // By status, then (within Excused/Absent) those who joined briefly before those who never joined, then by name.
+    const neverJoined = row => row[2] === NIL ? 1 : 0
+    rows.sort((x, y) => STATUS_ORDER[x[5]] - STATUS_ORDER[y[5]] || neverJoined(x) - neverJoined(y) || x[1].localeCompare(y[1]))
 
     if (rows.length) {
       // Leave one blank row between meetings (none right under the header).
       const lastRow = sheet.getLastRow()
       const firstRow = lastRow + (lastRow > 1 ? 2 : 1)
-      // Plain text keeps the time columns (Meeting, Join Time, Leave Time) as "9:15 PM";
-      // otherwise Sheets turns them into 24h time values.
-      ;[2, 4, 5].forEach(col => sheet.getRange(firstRow, col, rows.length, 1).setNumberFormat('@'))
+      // Plain text keeps Meeting Start, Join Time and Leave Time as "2026-10-07 11:28 PM" / "9:15 PM";
+      // otherwise Sheets turns them into 24h date/time values.
+      ;[1, 3, 4].forEach(col => sheet.getRange(firstRow, col, rows.length, 1).setNumberFormat('@'))
       sheet.getRange(firstRow, 1, rows.length, rows[0].length).setValues(rows)
       sheet.getRange(firstRow, STATUS_COL, rows.length, 1).setDataValidation(
         SpreadsheetApp.newDataValidation().requireValueInList(STATUS_CHOICES, true).build())
@@ -102,6 +107,169 @@ function runAttendance() {
     processed++
   })
   Logger.log('Done. New meetings written: ' + processed)
+}
+
+// Groups conference records into meetings. If the call ends by accident and is restarted
+// within RESTART_GAP_MINUTES, Meet creates a new conference; those are joined back into
+// one meeting so everyone's time across both adds up. Meetings still in progress or
+// shorter than MIN_CONFERENCE_MINUTES (test calls) are left out.
+// Returns [{ start: 'yyyy-MM-dd h:mm a', recs: [conference records] }].
+function meetings_(records) {
+  const groups = []
+  records
+    .slice()
+    .sort((a, b) => new Date(a.startTime) - new Date(b.startTime))
+    .forEach(rec => {
+      const start = new Date(rec.startTime)
+      const end = rec.endTime ? new Date(rec.endTime) : new Date()
+      const last = groups[groups.length - 1]
+      if (last && start - last.end <= RESTART_GAP_MINUTES * 60000) {
+        last.recs.push(rec)
+        if (end > last.end) last.end = end
+      } else {
+        groups.push({ recs: [rec], start, end })
+      }
+    })
+
+  return groups.filter(g => {
+    const label = Utilities.formatDate(g.start, TZ, 'yyyy-MM-dd h:mm a')
+    const minutes = Math.round((g.end - g.start) / 60000)
+    if (g.recs.some(rec => !rec.endTime)) {
+      Logger.log('Skipping meeting still in progress, started ' + label)
+      return false
+    }
+    if (minutes < MIN_CONFERENCE_MINUTES) {
+      Logger.log('Skipping short call (test call?) started ' + label + ', ' + minutes + ' min')
+      return false
+    }
+    if (g.recs.length > 1) Logger.log('Meeting started ' + label + ' was restarted; combining ' + g.recs.length + ' calls')
+    return true
+  }).map(g => ({ start: Utilities.formatDate(g.start, TZ, 'yyyy-MM-dd h:mm a'), recs: g.recs }))
+}
+
+// Run once from the editor: creates the "can't make it" form, saves its answers to a new
+// tab in the spreadsheet, and logs the link to share (e.g. pinned in the WhatsApp group).
+// Running it again just logs the link of the existing form.
+function createExcuseForm() {
+  const existing = getExcuseForm_()
+  if (existing) {
+    Logger.log('Form already exists. Share this link: ' + existing.getPublishedUrl())
+    return
+  }
+  const form = FormApp.create(EXCUSE_FORM_TITLE)
+    .setDescription("Can't join the prayer line? Pick your name and when you'll be away.")
+    .setConfirmationMessage("Thanks, you're marked as excused.")
+  form.addListItem().setTitle(EXCUSE_Q_NAME).setRequired(true)
+  const type = form.addMultipleChoiceItem().setTitle(EXCUSE_Q_TYPE).setRequired(true)
+
+  // "Just today" submits straight away; the other two each get one more page, which submits when done.
+  const days = form.addPageBreakItem().setTitle(TYPE_DAYS)
+  form.addDateItem().setTitle(EXCUSE_Q_FROM).setRequired(true)
+  form.addDateItem().setTitle(EXCUSE_Q_TO).setHelpText('Leave blank if it is just one day.')
+
+  const weekly = form.addPageBreakItem().setTitle(TYPE_WEEKLY).setGoToPage(FormApp.PageNavigationType.SUBMIT)
+    .setHelpText('For regular conflicts, like early mornings. Counts for ' + WEEKLY_MONTHS +
+      ' months from today; fill it in again after that.')
+  form.addCheckboxItem().setTitle(EXCUSE_Q_WEEKLY_DAYS).setRequired(true)
+    .setChoiceValues(WEEKDAYS.slice(1).concat(WEEKDAYS[0])) // Monday first
+
+  type.setChoices([
+    type.createChoice(TYPE_TODAY, FormApp.PageNavigationType.SUBMIT),
+    type.createChoice(TYPE_DAYS, days),
+    type.createChoice(TYPE_WEEKLY, weekly),
+  ])
+
+  form.setDestination(FormApp.DestinationType.SPREADSHEET, SPREADSHEET_ID)
+  PropertiesService.getScriptProperties().setProperty(EXCUSE_FORM_ID_PROP, form.getId())
+  syncExcuseFormNames_(getMembers_())
+  Logger.log('Form created. Share this link: ' + form.getPublishedUrl())
+  Logger.log('Edit it here: ' + form.getEditUrl())
+}
+
+function getExcuseForm_() {
+  const id = PropertiesService.getScriptProperties().getProperty(EXCUSE_FORM_ID_PROP)
+  if (!id) return null
+  try {
+    return FormApp.openById(id)
+  } catch (err) {
+    Logger.log('Excuse form ' + id + ' could not be opened (deleted?): ' + err.message)
+    return null
+  }
+}
+
+// Keeps the form's name dropdown equal to the current core members.
+function syncExcuseFormNames_(members) {
+  const form = getExcuseForm_()
+  if (!form) return
+  const item = form.getItems(FormApp.ItemType.LIST).find(it => it.getTitle() === EXCUSE_Q_NAME)
+  if (!item) return
+  const names = members.map(m => m.name).sort((a, b) => a.localeCompare(b))
+  const list = item.asListItem()
+  const current = list.getChoices().map(c => c.getValue())
+  if (current.join('\n') !== names.join('\n')) list.setChoiceValues(names)
+}
+
+// Excuses from the form's responses tab:
+// [{ name, from: 'yyyy-MM-dd', to: 'yyyy-MM-dd', days: [0-6] or null (every day in the range) }].
+// "Just today" is the day it was sent; weekly runs WEEKLY_MONTHS from that day.
+// Read from the tab (not the form) so a wrong entry can be fixed or deleted there by hand.
+function getExcuses_() {
+  const form = getExcuseForm_()
+  if (!form) return []
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID)
+  const sheet = ss.getSheets().find(s => {
+    const url = s.getFormUrl()
+    if (!url) return false
+    try {
+      return FormApp.openByUrl(url).getId() === form.getId()
+    } catch (err) {
+      return false
+    }
+  })
+  if (!sheet || sheet.getLastRow() < 2) return []
+  const values = sheet.getDataRange().getValues()
+  const header = values[0].map(normalize_)
+  const col = title => header.indexOf(normalize_(title))
+  const get = (r, title) => col(title) < 0 ? '' : r[col(title)]
+  const tz = ss.getSpreadsheetTimeZone()
+  const day = v => v instanceof Date ? Utilities.formatDate(v, tz, 'yyyy-MM-dd') : ''
+  // The day a form was sent, where a "day" runs from one nightly run to the next: sent at 1 AM,
+  // before the 2 AM run, it belongs to the meeting that started the evening before.
+  const sentDay = v => v instanceof Date
+    ? Utilities.formatDate(new Date(v.getTime() - NIGHTLY_HOUR * 3600 * 1000), TZ, 'yyyy-MM-dd') : ''
+  const weekdays = v => String(v).split(',').map(d => WEEKDAYS.indexOf(d.trim())).filter(i => i >= 0)
+
+  const excuses = []
+  values.slice(1).forEach(r => {
+    const name = String(get(r, EXCUSE_Q_NAME)).trim()
+    const filled = sentDay(r[0]) // from the Timestamp column
+    const type = String(get(r, EXCUSE_Q_TYPE)).trim()
+    if (!name || !filled) return
+    if (type === TYPE_TODAY) {
+      excuses.push({ name, from: filled, to: filled, days: null })
+    } else if (type === TYPE_DAYS) {
+      let from = day(get(r, EXCUSE_Q_FROM))
+      let to = day(get(r, EXCUSE_Q_TO)) || from
+      if (to < from) [from, to] = [to, from]
+      if (from) excuses.push({ name, from, to, days: null })
+    } else if (type === TYPE_WEEKLY) {
+      const ws = weekdays(get(r, EXCUSE_Q_WEEKLY_DAYS))
+      if (ws.length) excuses.push({ name, from: filled, to: addMonths_(filled, WEEKLY_MONTHS), days: ws })
+    }
+  })
+  return excuses
+}
+
+function addMonths_(isoDay, n) {
+  const d = new Date(isoDay + 'T12:00:00Z')
+  d.setUTCMonth(d.getUTCMonth() + n)
+  return d.toISOString().slice(0, 10)
+}
+
+function isExcused_(excuses, name, day) {
+  const weekday = new Date(day + 'T12:00:00Z').getUTCDay()
+  return excuses.some(e => normalize_(e.name) === normalize_(name) &&
+    e.from <= day && day <= e.to && (e.days === null || e.days.includes(weekday)))
 }
 
 // Run once from the editor: runs runAttendance every night at NIGHTLY_HOUR.
@@ -113,16 +281,18 @@ function installNightlyTrigger() {
   Logger.log('Nightly trigger set for ' + NIGHTLY_HOUR + ':00 ' + TZ)
 }
 
-// Per-person attendance for one conference, keyed by normalized name.
+// Per-person attendance across one meeting's conferences, keyed by normalized name.
 // Join/leave intervals are grouped by name and overlapping ones merged, so time on
 // two devices at once isn't doubled, while separate visits (left and rejoined) add up.
-function attendance_(rec) {
+function attendance_(recs) {
   const byName = {}
-  listAll_(rec.name + '/participants', 'participants').forEach(p => {
-    const name = displayName_(p)
-    const entry = byName[normalize_(name)] || (byName[normalize_(name)] = { name, intervals: [] })
-    listAll_(p.name + '/participantSessions', 'participantSessions').forEach(s => {
-      entry.intervals.push([new Date(s.startTime), s.endTime ? new Date(s.endTime) : new Date(rec.endTime)])
+  recs.forEach(rec => {
+    listAll_(rec.name + '/participants', 'participants').forEach(p => {
+      const name = displayName_(p)
+      const entry = byName[normalize_(name)] || (byName[normalize_(name)] = { name, intervals: [] })
+      listAll_(p.name + '/participantSessions', 'participantSessions').forEach(s => {
+        entry.intervals.push([new Date(s.startTime), s.endTime ? new Date(s.endTime) : new Date(rec.endTime)])
+      })
     })
   })
 
@@ -328,18 +498,11 @@ function getSheetByGid_(gid, label) {
   return sheet
 }
 
-// "date|meeting start" keys of meetings already in the sheet.
+// Meeting Start values already in the sheet.
 function recordedMeetings_(sheet) {
   const last = sheet.getLastRow()
   if (last < 2) return new Set()
-  return new Set(sheet.getRange(2, 1, last - 1, 2).getDisplayValues().map(r => normalizeDate_(r[0]) + '|' + r[1]))
-}
-
-// Sheets may display the Date column in its own format; bring it back to yyyy-MM-dd.
-function normalizeDate_(text) {
-  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text
-  const d = new Date(text)
-  return isNaN(d) ? text : Utilities.formatDate(d, TZ, 'yyyy-MM-dd')
+  return new Set(sheet.getRange(2, 1, last - 1, 1).getDisplayValues().map(r => r[0]).filter(Boolean))
 }
 
 function listAll_(path, key) {
