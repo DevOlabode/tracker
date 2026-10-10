@@ -14,15 +14,9 @@ npm run dev
 
 Open the printed local URL (usually http://localhost:5173).
 
-## 2. Configure the names
+## 2. Names come from the members tab
 
-Edit `frontend/src/config/names.js`:
-
-```js
-export const NAMES = ['ESTHER', 'PELUMI', 'SUBOMI', 'BRIGHT']
-```
-
-Replace with the real list. No other file needs to change.
+The name field is a search box. After 3 letters, the webpage asks Apps Script (`doGet` in `apps-script/Code.gs`) for matches and shows at most 5, as "First L." — the full member list never reaches the browser. Submissions send member ids; Apps Script saves the full names. Every active member on the members tab (any member type) is searchable as soon as they're added there; nothing in the code needs to change.
 
 ## 3. Deploy the Google Apps Script
 
@@ -50,8 +44,8 @@ Restart `npm run dev` after changing `.env`.
 ## How data flows
 
 1. User fills the form and submits.
-2. The frontend POSTs `{ name, location, date }` as JSON to the Apps Script URL.
-3. Apps Script parses the body, validates the three fields, and appends a row: `Type | Name | Location | Date`.
+2. The frontend POSTs `{ type, memberIds, location, date }` as JSON to the Apps Script URL.
+3. Apps Script looks up the members' full names, validates the fields, and appends a row: `Type | Name | Location | Date`.
 4. Apps Script returns `{ success, message }`, which the frontend uses to show a success or error state.
 
 ### Why the request uses `Content-Type: text/plain`

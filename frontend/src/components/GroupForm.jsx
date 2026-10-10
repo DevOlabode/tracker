@@ -1,10 +1,10 @@
 import { useState } from 'react'
-import { NAMES } from '../config/names'
 import { submitEntry } from '../services/submissions'
+import MemberSearch from './MemberSearch'
 import DateField, { dateError } from './DateField'
 import LocationField, { OTHER, resolveLocation } from './LocationField'
 
-const EMPTY_FORM = { names: [], location: '', otherLocation: '', date: '' }
+const EMPTY_FORM = { members: [], location: '', otherLocation: '', date: '' }
 
 export default function GroupForm({ onBack }) {
   const [form, setForm] = useState(EMPTY_FORM)
@@ -14,7 +14,7 @@ export default function GroupForm({ onBack }) {
 
   function validate() {
     const next = {}
-    if (form.names.length === 0) next.names = 'Select at least one name.'
+    if (form.members.length === 0) next.names = 'Add at least one name.'
     if (!resolveLocation(form)) next.location = form.location === OTHER ? 'Please type your location.' : 'Please select a location.'
     const dateMsg = dateError(form.date)
     if (dateMsg) next.date = dateMsg
@@ -22,11 +22,12 @@ export default function GroupForm({ onBack }) {
     return Object.keys(next).length === 0
   }
 
-  function toggleName(n) {
-    setForm((f) => ({
-      ...f,
-      names: f.names.includes(n) ? f.names.filter((x) => x !== n) : [...f.names, n],
-    }))
+  function addMember(member) {
+    setForm((f) => (f.members.some((m) => m.id === member.id) ? f : { ...f, members: [...f.members, member] }))
+  }
+
+  function removeMember(id) {
+    setForm((f) => ({ ...f, members: f.members.filter((m) => m.id !== id) }))
   }
 
   function handleChange(field) {
@@ -43,7 +44,7 @@ export default function GroupForm({ onBack }) {
     try {
       const result = await submitEntry({
         type: 'Group',
-        name: form.names.join(', '),
+        memberIds: form.members.map((m) => m.id),
         location: resolveLocation(form),
         date: form.date,
       })
@@ -66,16 +67,16 @@ export default function GroupForm({ onBack }) {
         <div className="field">
           <label>Names</label>
 
-          {form.names.length > 0 && (
+          {form.members.length > 0 && (
             <div className="selected-chips">
-              {form.names.map((n) => (
-                <span key={n} className="chip">
-                  {n}
+              {form.members.map((m) => (
+                <span key={m.id} className="chip">
+                  {m.label}
                   <button
                     type="button"
                     className="chip-remove"
-                    aria-label={`Remove ${n}`}
-                    onClick={() => toggleName(n)}
+                    aria-label={`Remove ${m.label}`}
+                    onClick={() => removeMember(m.id)}
                   >
                     ×
                   </button>
@@ -84,14 +85,11 @@ export default function GroupForm({ onBack }) {
             </div>
           )}
 
-          <div className="name-checklist">
-            {NAMES.map((n) => (
-              <label key={n} className="name-checkbox">
-                <input type="checkbox" checked={form.names.includes(n)} onChange={() => toggleName(n)} />
-                {n}
-              </label>
-            ))}
-          </div>
+          <MemberSearch
+            onSelect={addMember}
+            exclude={form.members.map((m) => m.id)}
+            placeholder="Type a name to add someone"
+          />
           {errors.names && <p className="error">{errors.names}</p>}
         </div>
 

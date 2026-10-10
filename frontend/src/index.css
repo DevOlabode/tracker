@@ -247,17 +247,6 @@ button:disabled {
   padding: 2px 4px;
 }
 
-.name-checklist {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  border: 1px solid #ccc;
-  border-radius: 8px;
-  padding: 10px 12px;
-  max-height: 200px;
-  overflow-y: auto;
-}
-
 .name-checkbox {
   display: flex;
   align-items: center;
@@ -270,4 +259,48 @@ button:disabled {
 .name-checkbox input {
   width: 18px;
   height: 18px;
+}
+
+.remember {
+  font-size: 0.85rem;
+  color: #444;
+}
+
+.hint {
+  color: #666;
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+.member-search {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.search-results {
+  list-style: none;
+  margin: 0;
+  padding: 4px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.search-result {
+  width: 100%;
+  text-align: left;
+  background: none;
+  color: #1a1a1a;
+  font-weight: 400;
+  padding: 10px 12px;
+  border-radius: 6px;
+}
+
+.search-result:hover,
+.search-result:focus {
+  background: #e8effe;
+  color: #1d4ed8;
 }

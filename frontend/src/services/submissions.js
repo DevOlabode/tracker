@@ -3,7 +3,8 @@ const ENDPOINT = import.meta.env.VITE_GOOGLE_APPS_SCRIPT_URL
 // Content-Type must stay 'text/plain' so this qualifies as a CORS "simple
 // request" — Apps Script web apps don't implement the OPTIONS preflight,
 // so a JSON content-type would make the browser block the request.
-export async function submitEntry({ type, name, location, date }) {
+// memberIds come from the name search; Apps Script turns them into full names.
+export async function submitEntry({ type, memberIds, location, date }) {
   if (!ENDPOINT) {
     throw new Error('VITE_GOOGLE_APPS_SCRIPT_URL is not configured')
   }
@@ -11,7 +12,7 @@ export async function submitEntry({ type, name, location, date }) {
   const response = await fetch(ENDPOINT, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify({ type, name, location, date }),
+    body: JSON.stringify({ type, memberIds, location, date }),
   })
 
   if (!response.ok) {
